@@ -773,7 +773,10 @@ def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure =
     G_temp = copy.deepcopy(G)
     for e in G_temp.es: # delete all edges
         G_temp.es.delete(e)
-        
+    g_temp_index = [v.index for v in G_temp.vs]
+    for poi in pois_indices:
+        if poi not in g_temp_index:
+            print(f"Warning: POI {poi} not found in graph!")
     poipairs = poipairs_by_distance(G, pois, True)
     if len(poipairs) == 0: return ([], [])
 
@@ -793,7 +796,6 @@ def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure =
     GT_abstracts = []
     GTs = []
     for prune_quantile in tqdm(prune_quantiles, desc = "Greedy triangulation", leave = False):
-        print(pois_indices)
         GT_abstract = copy.deepcopy(G_temp.subgraph(pois_indices))
         GT_abstract = greedy_triangulation(GT_abstract, poipairs, prune_quantile, prune_measure, edgeorder)
         GT_abstracts.append(GT_abstract)

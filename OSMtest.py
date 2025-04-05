@@ -20,26 +20,26 @@ bike_lanes = edges[edges["highway"].isin(["cycleway"])]
 
 location = ox.geocoder.geocode_to_gdf(place_name)
 location = fill_holes(extract_relevant_polygon(place_name, shapely.geometry.shape(location['geometry'][0])))
-try:
-    color = cm.rainbow(np.linspace(0,1,len(location)))
-    for poly,c in zip(location, color):
-        plt.plot(*poly.exterior.xy, c = c)
-        for intr in poly.interiors:
-            plt.plot(*intr.xy, c = "red")
-except:
-    plt.plot(*location.exterior.xy)
-#plt.show()
+debug = False
+if debug is True:
+    try:
+        color = cm.rainbow(np.linspace(0,1,len(location)))
+        for poly,c in zip(location, color):
+            plt.plot(*poly.exterior.xy, c = c)
+            for intr in poly.interiors:
+                plt.plot(*intr.xy, c = "red")
+    except:
+        plt.plot(*location.exterior.xy)
+    plt.show()
 
 G = ox.graph_from_polygon(location, network_type="drive", retain_all= True, simplify= True)
-fig, ax = ox.plot_graph(G, show=True, node_size=10, edge_linewidth=0.5)
-
-components = list(nx.weakly_connected_components(G))
-for component in components:
-    print(len(component))
-    print("===============================")
+#fig, ax = ox.plot_graph(G, show=True, node_size=10, edge_linewidth=0.5)
+largest_component = max(nx.weakly_connected_components(G), key=len)
+G_largest = G.subgraph(largest_component).copy()
+fig, ax = ox.plot_graph(G_largest, show=True, node_size=10, edge_linewidth=0.5)
 
 
-nodes = list(G.nodes(data=True))
+nodes = list(G_largest.nodes(data=True))
 nodes_to_use = {}
 osmid_list = []
 x_list = []
@@ -51,7 +51,7 @@ for node, attr in (nodes):
 nodes_to_use.update({"osmid" : osmid_list, "x": x_list, "y": y_list})
 nodes_df = pd.DataFrame(nodes_to_use)
 
-edges = list(G.edges(data = True))
+edges = list(G_largest.edges(data = True))
 u_list = []
 v_list = []
 length_list = []
@@ -122,8 +122,8 @@ point_of_interest_gdf = gpd.GeoDataFrame(
 
 
 
-metro_stations_nodes = [ox.distance.nearest_nodes(G, row.geometry.x, row.geometry.y) for _, row in metro_stations_gdf.iterrows()]
-poi_nodes = [ox.distance.nearest_nodes(G, d["lon"], d["lat"]) for d in points_of_interest]
+metro_stations_nodes = [ox.distance.nearest_nodes(G_largest, row.geometry.x, row.geometry.y) for _, row in metro_stations_gdf.iterrows()]
+poi_nodes = [ox.distance.nearest_nodes(G_largest, d["lon"], d["lat"]) for d in points_of_interest]
 nnids = metro_stations_nodes + poi_nodes
 #node_mapping = {node: idx for idx, node in enumerate(G.nodes())}
 #for i, node in enumerate(nnids):
@@ -158,3 +158,5 @@ G_combined = G.copy()
 #plt.legend()
 #plt.title("Bike Lanes in Bucharest")
 #plt.show()
+
+#TODO-RUTE PE GRAPHUL FINAL DE LA MICHAEL
