@@ -45,8 +45,10 @@ from pathlib import Path
 
 plotparam = {"bbox": (1280,1280),
 			"dpi": 96,
+            "toproutes": {"width": 0.5, "edge_color": 'Green'},
 			"carall": {"width": 0.5, "edge_color": '#999999'},
 			# "biketrack": {"width": 1.25, "edge_color": '#2222ff'},
+            "existing_biketrack": {"width": 0.5, "edge_color": 'Blue'},
             "biketrack": {"width": 1, "edge_color": '#000000'},
 			"biketrack_offstreet": {"width": 0.75, "edge_color": '#00aa22'},
 			"bikeable": {"width": 0.75, "edge_color": '#222222'},
@@ -304,23 +306,26 @@ def osm_to_ig(node, edge):
     edge_info = {}
     edge_info["weight"] = []
     edge_info["osmid"] = []
+    edge_info['name'] = []
     for i in range(len(edge)):
         edge_list.append([id_dict.get(edge['u'][i]), id_dict.get(edge['v'][i])])
         edge_info["weight"].append(round(edge['length'][i], 10))
         edge_info["osmid"].append(edge['osmid'][i])
+        edge_info['name'].append(edge['name'][i])
 
     G.add_edges(edge_list) # attributes = edge_info doesn't work although it should: https://igraph.org/python/doc/igraph.Graph-class.html#add_edges
     for i in range(len(edge)):
         G.es[i]["weight"] = edge_info["weight"][i]
         G.es[i]["osmid"] = edge_info["osmid"][i]
+        G.es[i]['name'] = edge_info['name'][i]
     G.simplify(combine_edges=max)
     return G
 
 
 def compress_file(p, f, filetype = ".csv", delete_uncompressed = True):
-    with zipfile.ZipFile(p + f + ".zip", 'w', zipfile.ZIP_DEFLATED) as zfile:
-        zfile.write(p + f + filetype, f + filetype)
-    if delete_uncompressed: os.remove(p + f + filetype)
+    with zipfile.ZipFile(p/f'{f}.zip', 'w', zipfile.ZIP_DEFLATED) as zfile:
+        zfile.write(p/f'{f}{filetype}', f + filetype)
+    if delete_uncompressed: os.remove(p/f'{f}{filetype}')
 
 def ox_to_csv(G, p, placeid, parameterid, postfix = "", compress = True, verbose = True):
     if "crs" not in G.graph:
@@ -331,10 +336,10 @@ def ox_to_csv(G, p, placeid, parameterid, postfix = "", compress = True, verbose
         node, edge = gpd.GeoDataFrame(), gpd.GeoDataFrame()
     prefix = placeid + '_' + parameterid + postfix
 
-    node.to_csv(p + prefix + '_nodes.csv', index = True)
+    node.to_csv(p/f"{prefix}_nodes.csv", index = True)
     if compress: compress_file(p, prefix + '_nodes')
  
-    edge.to_csv(p + prefix + '_edges.csv', index = True)
+    edge.to_csv(p/f'{prefix}_edges.csv', index = True)
     if compress: compress_file(p, prefix + '_edges')
 
     if verbose: print(placeid + ": Successfully wrote graph " + parameterid + postfix)
@@ -351,10 +356,10 @@ def check_extract_zip(p, prefix):
     """
 
     try: # Use zip files if available
-        with zipfile.ZipFile(p + prefix + '_nodes.zip', 'r') as zfile:
-            zfile.extract(prefix + '_nodes.csv', p)
-        with zipfile.ZipFile(p + prefix + '_edges.zip', 'r') as zfile:
-            zfile.extract(prefix + '_edges.csv', p)
+        with zipfile.ZipFile(p/f'{prefix}_nodes.zip', 'r') as zfile:
+            zfile.extract(f'{prefix}_nodes.csv', p)
+        with zipfile.ZipFile(p/f'{prefix}_edges.zip', 'r') as zfile:
+            zfile.extract(f'{prefix}_edges.csv', p)
         return True
     except:
         return False
@@ -368,8 +373,7 @@ def csv_to_ox(p, placeid, parameterid):
     """
     prefix = placeid + '_' + parameterid
     compress = check_extract_zip(p, prefix)
-    
-    with open(p + prefix + '_edges.csv', 'r') as f:
+    with open(p/f'{prefix}_edges.csv', 'r', encoding='utf-8') as f:
         header = f.readline().strip().split(",")
 
         lines = []
@@ -380,7 +384,7 @@ def csv_to_ox(p, placeid, parameterid):
             line_string = "" + line_list[header.index("u")] + " "+ line_list[header.index("v")] + " " + osmid + " " + length
             lines.append(line_string)
         G = nx.parse_edgelist(lines, nodetype = int, data = (("osmid", int),("length", float)), create_using = nx.MultiDiGraph) # MultiDiGraph is necessary for OSMNX, for example for get_undirected(G) in utils_graph.py
-    with open(p + prefix + '_nodes.csv', 'r') as f:
+    with open(p/f'{prefix}_nodes.csv', 'r', encoding='utf-8') as f:
         header = f.readline().strip().split(",")
         values_x = {}
         values_y = {}
@@ -394,8 +398,8 @@ def csv_to_ox(p, placeid, parameterid):
         nx.set_node_attributes(G, values_y, "y")
 
     if compress:
-        os.remove(p + prefix + '_nodes.csv')
-        os.remove(p + prefix + '_edges.csv')
+        os.remove(p/f'{prefix}_nodes.csv')
+        os.remove(p/f'{prefix}_edges.csv')
     return G
 
 
@@ -409,8 +413,8 @@ def csv_to_ig(p, placeid, parameterid, cleanup = True):
     compress = check_extract_zip(p, prefix)
     empty = False
     try:
-        n = pd.read_csv(p + prefix + '_nodes.csv')
-        e = pd.read_csv(p + prefix + '_edges.csv')
+        n = pd.read_csv(p/f'{prefix}_nodes.csv')
+        e = pd.read_csv(p/f'{prefix}_edges.csv')
     except:
         empty = True
     if empty:
@@ -428,6 +432,38 @@ def ig_to_geojson(G):
     return G_geojson
 
 
+def write_result(pth, res, mode, placeid, poi_source, prune_measure, suffix, dictnested = {}):
+    """Write results (pickle or dict to csv)
+    """
+    if mode == "pickle":
+        openmode = "wb"
+    else:
+        openmode = "w"
+
+    if poi_source:
+        filename = placeid + '_poi_' + poi_source + "_" + prune_measure + suffix
+    else:
+        filename = placeid + "_" + prune_measure + suffix
+
+    with open(pth/filename, openmode) as f:
+        if mode == "pickle":
+            pickle.dump(res, f)
+        elif mode == "dict":
+            w = csv.writer(f)
+            w.writerow(res.keys())
+            try: # dict with list values
+                w.writerows(zip(*res.values()))
+            except: # dict with single values
+                w.writerow(res.values())
+        elif mode == "dictnested":
+            # https://stackoverflow.com/questions/29400631/python-writing-nested-dictionary-to-csv
+            fields = ['network'] + list(dictnested.keys())
+            w = csv.DictWriter(f, fields)
+            w.writeheader()
+            for key, val in sorted(res.items()):
+                row = {'network': key}
+                row.update(val)
+                w.writerow(row)
 
 
 # NETWORK GENERATION
@@ -764,19 +800,13 @@ def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure =
     if len(pois) < 2: return ([], []) # We can't do anything with less than 2 POIs
 
     # GT_abstract is the GT with same nodes but euclidian links to keep track of edge crossings
-    pois_indices = set(pois)
+    pois_indices = set()
     for poi in pois:
-        try:
-            pois_indices.add(G.vs.find(id = poi).index)
-        except Exception:
-            print(f"poi {poi}  not found in the graph")
+        pois_indices.add(G.vs.find(id = poi).index)
     G_temp = copy.deepcopy(G)
     for e in G_temp.es: # delete all edges
         G_temp.es.delete(e)
-    g_temp_index = [v.index for v in G_temp.vs]
-    for poi in pois_indices:
-        if poi not in g_temp_index:
-            print(f"Warning: POI {poi} not found in graph!")
+    
     poipairs = poipairs_by_distance(G, pois, True)
     if len(poipairs) == 0: return ([], [])
 
@@ -836,7 +866,6 @@ def poipairs_by_distance(G, pois, return_distances = False):
     # Get sequences of nodes and edges in shortest paths between all pairs of pois
     poi_nodes = []
     poi_edges = []
-    print(f"printing indices: {indices}")
     for c, v in enumerate(indices):
         poi_nodes.append(G.get_shortest_paths(v, indices[c:], weights = "weight", output = "vpath"))
         poi_edges.append(G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath"))
@@ -1376,5 +1405,12 @@ def ig_to_shapely(G):
     return G_shapely
 
 
+def initplot():
+    fig = plt.figure(figsize=(plotparam["bbox"][0]/plotparam["dpi"], plotparam["bbox"][1]/plotparam["dpi"]), dpi=plotparam["dpi"])
+    plt.axes().set_aspect('equal')
+    plt.axes().set_xmargin(0.01)
+    plt.axes().set_ymargin(0.01)
+    plt.axes().set_axis_off() # Does not work anymore - unnown why not.
+    return fig
 
 print("Loaded functions.\n")
