@@ -36,7 +36,7 @@ import osmnx as ox
 import shapely
 from haversine import haversine, haversine_vector
 import pyproj
-from shapely.geometry import Point, MultiPoint, LineString, Polygon, MultiLineString, MultiPolygon
+from shapely.geometry import Point, MultiPoint, LineString, Polygon, MultiLineString, MultiPolygon, box
 import shapely.ops as ops
 import geopandas as gpd
 import geojson
@@ -187,7 +187,7 @@ def simplify_ig(G):
     return output
 
 
-def nxdraw(G, networktype, map_center = False, nnids = False, drawfunc = "nx.draw", nodesize = 0, weighted = False, maxwidthsquared = 0, simplified = False):
+def nxdraw(G, networktype, map_center = False, nnids = False, drawfunc = "nx.draw", nodesize = 0, weighted = False, maxwidthsquared = 0, simplified = False, ax = None):
     """Take an igraph graph G and draw it with a networkx drawfunc.
     """
     if simplified:
@@ -205,11 +205,11 @@ def nxdraw(G, networktype, map_center = False, nnids = False, drawfunc = "nx.dra
         widths = list(nx.get_edge_attributes(G_nx, "weight").values())
         widthfactor = 1.1 * math.sqrt(maxwidthsquared) / max(widths)
         widths = [max(0.33, w * widthfactor) for w in widths]
-        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = widths)
+        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = widths, ax = ax)
     elif type(weighted) is float or type(weighted) is int and weighted > 0:
-        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = weighted)
+        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = weighted, ax = ax)
     else:
-        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize)
+        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, ax = ax)
     return map_center
 
 
@@ -293,32 +293,43 @@ def osm_to_ig(node, edge):
     x_coords = node['x'].tolist() 
     y_coords = node['y'].tolist()
     ids = node['osmid'].tolist()
+    try:
+        density = node["density"].tolist()
+    except:
+        pass
     coords = []
 
     for i in range(len(x_coords)):
         G.add_vertex(x = x_coords[i], y = y_coords[i], id = ids[i])
+        try:
+            G.vs[i]["density"] = density[i]
+        except:
+            pass
         coords.append((x_coords[i], y_coords[i]))
 
     id_dict = dict(zip(G.vs['id'], np.arange(0, G.vcount()).tolist()))
     coords_dict = dict(zip(np.arange(0, G.vcount()).tolist(), coords))
+    if not edge.empty:
+        edge_list = []
+        edge_info = {}
+        edge_info["weight"] = []
+        edge_info["osmid"] = []
+        edge_info['name'] = []
+        for i in range(len(edge)):
+            edge_list.append([id_dict.get(edge['u'][i]), id_dict.get(edge['v'][i])])
+            edge_info["weight"].append(round(edge['length'][i], 10))
+            edge_info["osmid"].append(edge['osmid'][i])
+            edge_info['name'].append(edge['name'][i])
 
-    edge_list = []
-    edge_info = {}
-    edge_info["weight"] = []
-    edge_info["osmid"] = []
-    edge_info['name'] = []
-    for i in range(len(edge)):
-        edge_list.append([id_dict.get(edge['u'][i]), id_dict.get(edge['v'][i])])
-        edge_info["weight"].append(round(edge['length'][i], 10))
-        edge_info["osmid"].append(edge['osmid'][i])
-        edge_info['name'].append(edge['name'][i])
-
-    G.add_edges(edge_list) # attributes = edge_info doesn't work although it should: https://igraph.org/python/doc/igraph.Graph-class.html#add_edges
-    for i in range(len(edge)):
-        G.es[i]["weight"] = edge_info["weight"][i]
-        G.es[i]["osmid"] = edge_info["osmid"][i]
-        G.es[i]['name'] = edge_info['name'][i]
-    G.simplify(combine_edges=max)
+        G.add_edges(edge_list) # attributes = edge_info doesn't work although it should: https://igraph.org/python/doc/igraph.Graph-class.html#add_edges
+        for i in range(len(edge)):
+            G.es[i]["weight"] = edge_info["weight"][i]
+            G.es[i]["osmid"] = edge_info["osmid"][i]
+            G.es[i]['name'] = edge_info['name'][i]
+        try:
+            G.simplify(combine_edges=max)
+        except TypeError:
+            G.simplify(combine_edges = {"weight" : max})
     return G
 
 
@@ -411,11 +422,19 @@ def csv_to_ig(p, placeid, parameterid, cleanup = True):
     """
     prefix = placeid + '_' + parameterid
     compress = check_extract_zip(p, prefix)
-    empty = False
+    n_empty = False
+    e_empty = False
     try:
         n = pd.read_csv(p/f'{prefix}_nodes.csv')
+    except:
+        n_empty = True
+    try:
         e = pd.read_csv(p/f'{prefix}_edges.csv')
     except:
+        e = pd.DataFrame()
+        e_empty = True
+    empty = False
+    if e_empty and n_empty:
         empty = True
     if empty:
         return ig.Graph(directed = False)
@@ -848,6 +867,15 @@ def greedy_triangulation_routing(G, pois, prune_quantiles = [1], prune_measure =
     
     return (GTs, GT_abstracts)
     
+def set_analysissubplot(key, ax):
+    ax.set_xlim(0, 1)
+    ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    if key in ["length", "length_lcc", "coverage", "poi_coverage", "components", "efficiency_local", "efficiency_global"]:
+        ax.set_ylim(bottom = 0)
+    if key in ["directness_lcc", "directness_lcc_linkwise", "directness", "directness_all_linkwise"]:
+        ax.set_ylim(bottom = 0.2)
+    if key in ["directness_lcc", "directness_lcc_linkwise", "directness", "directness_all_linkwise", "efficiency_global", "efficiency_local"]:
+        ax.set_ylim(top = 1)
     
 def poipairs_by_distance(G, pois, return_distances = False):
     """Calculates the (weighted) graph distances on G for a subset of nodes pois.
@@ -1098,7 +1126,7 @@ def calculate_efficiency_local(G, numnodepairs = 500, normalized = True):
     return listmean(EGi)
 
 
-def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
+def calculate_metrics(G, GT_abstract, G_big, population_squares ,nnids, calcmetrics = {"length":0,
           "length_lcc":0,
           "coverage": 0,
           "directness": 0,
@@ -1110,7 +1138,8 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
           "efficiency_global": 0,
           "efficiency_local": 0,
           "directness_lcc_linkwise": 0,
-          "directness_all_linkwise": 0
+          "directness_all_linkwise": 0,
+          "population_coverage": 0
          }, buffer_walk = 500, numnodepairs = 500, verbose = False, return_cov = True, G_prev = ig.Graph(), cov_prev = Polygon(), ignore_GT_abstract = False, Gexisting = {}):
     """Calculates all metrics (using the keys from calcmetrics).
     """
@@ -1212,7 +1241,11 @@ def calculate_metrics(G, GT_abstract, G_big, nnids, calcmetrics = {"length":0,
                 output["directness_all_linkwise"] = output["directness_lcc_linkwise"]
             else: # we have >1 components
                 output["directness_all_linkwise"] = calculate_directness_linkwise(G, numnodepairs) # number of components is checked within calculate_directness_linkwise()
-
+        # Population Covered
+        if "population_coverage" in calcmetrics:
+            if verbose: print("Calculating population coverage")
+            population = calculate_population_coverage(G, G_big,population_squares, buffer_walk)
+            output["population_coverage"] = population
     if return_cov: 
         return (output, cov)
     else:
@@ -1283,7 +1316,7 @@ def intersect_igraphs(G1, G2):
     return G_inter
 
 
-def calculate_metrics_additively(Gs, GT_abstracts, prune_quantiles, G_big, nnids, buffer_walk = 500, numnodepairs = 500, verbose = False, return_cov = True, Gexisting = {}, output = {
+def calculate_metrics_additively(Gs, GT_abstracts,population_squares,prune_quantiles, G_big, nnids, buffer_walk = 500, numnodepairs = 500, verbose = False, return_cov = True, Gexisting = {}, output = {
             "length":[],
             "length_lcc":[],
             "coverage": [],
@@ -1298,7 +1331,8 @@ def calculate_metrics_additively(Gs, GT_abstracts, prune_quantiles, G_big, nnids
             "efficiency_global_routed": [],
             "efficiency_local_routed": [],
             "directness_lcc_linkwise": [],
-            "directness_all_linkwise": []        
+            "directness_all_linkwise": [],
+            "population_coverage" : []      
             }):
     """Calculates all metrics, additively. 
     Coverage differences are calculated in every step instead of the whole coverage.
@@ -1309,8 +1343,7 @@ def calculate_metrics_additively(Gs, GT_abstracts, prune_quantiles, G_big, nnids
     cov_prev = Polygon()
     GT_prev = ig.Graph()
     for GT, GT_abstract, prune_quantile in zip(Gs, GT_abstracts, tqdm(prune_quantiles, desc = "Bicycle networks", leave = False)):
-        if verbose: print("Calculating bike network metrics for quantile " + str(prune_quantile))
-        metrics, cov = calculate_metrics(GT, GT_abstract, G_big, nnids, output, buffer_walk, numnodepairs, verbose, return_cov, GT_prev, cov_prev, False, Gexisting)
+        metrics, cov = calculate_metrics(GT, GT_abstract, G_big, population_squares,nnids, output, buffer_walk, numnodepairs, verbose, return_cov, GT_prev, cov_prev, False, Gexisting)
         
         for key in output.keys():
             output[key].append(metrics[key])
@@ -1412,5 +1445,59 @@ def initplot():
     plt.axes().set_ymargin(0.01)
     plt.axes().set_axis_off() # Does not work anymore - unnown why not.
     return fig
+
+def calculate_population_coverage(G, G_carall, population_squares, buffer_m):
+    loncenter = listmean([v["x"] for v in G_carall.vs])
+    latcenter = listmean([v["y"] for v in G_carall.vs])
+    local_azimuthal_projection = "+proj=aeqd +R=6371000 +units=m +lat_0={} +lon_0={}".format(latcenter, loncenter)
+    wgs84_to_aeqd = pyproj.Transformer.from_proj(
+        pyproj.Proj("+proj=longlat +datum=WGS84 +no_defs"),
+        pyproj.Proj(local_azimuthal_projection))
+    aeqd_to_wgs84 = pyproj.Transformer.from_proj(
+        pyproj.Proj(local_azimuthal_projection),
+        pyproj.Proj("+proj=longlat +datum=WGS84 +no_defs"))
+    edgetuples = [((e.source_vertex["x"], e.source_vertex["y"]), (e.target_vertex["x"], e.target_vertex["y"])) for e in G.es]
+    # Shapely buffer seems slow for complex objects: https://stackoverflow.com/questions/57753813/speed-up-shapely-buffer
+    # Therefore we buffer piecewise.
+    cov_added = Polygon()
+    for c, t in enumerate(edgetuples):
+        # if cov.geom_type == 'MultiPolygon' and c % 1000 == 0: print(str(c)+"/"+str(len(edgetuples)), sum([len(pol.exterior.coords) for pol in cov]))
+        # elif cov.geom_type == 'Polygon' and c % 1000 == 0: print(str(c)+"/"+str(len(edgetuples)), len(pol.exterior.coords))
+        buf = ops.transform(aeqd_to_wgs84.transform, ops.transform(wgs84_to_aeqd.transform, LineString(t)).buffer(buffer_m))
+        cov_added = ops.unary_union([cov_added, Polygon(buf)])
+    cov_transformed = ops.transform(wgs84_to_aeqd.transform, cov_added)
+    population_covered = 0
+    for _, square_details in population_squares.items():
+        square = square_details['square_proj']
+        density = square_details['density']
+        overlap = cov_transformed.intersection(square)
+        if not overlap.is_empty:
+            overlap_area = overlap.area / 1000000
+            population_covered += overlap_area * density
+    return population_covered
+
+def create_pop_density_proj(G_carall, G_population_centers, buffer_m):
+    squares = {}
+    loncenter = listmean([v["x"] for v in G_carall.vs])
+    latcenter = listmean([v["y"] for v in G_carall.vs])
+    local_azimuthal_projection = "+proj=aeqd +R=6371000 +units=m +lat_0={} +lon_0={}".format(latcenter, loncenter)
+    wgs84_to_aeqd = pyproj.Transformer.from_proj(
+        pyproj.Proj("+proj=longlat +datum=WGS84 +no_defs"),
+        pyproj.Proj(local_azimuthal_projection))
+    aeqd_to_wgs84 = pyproj.Transformer.from_proj(
+        pyproj.Proj(local_azimuthal_projection),
+        pyproj.Proj("+proj=longlat +datum=WGS84 +no_defs"))
+    for v in G_population_centers.vs:
+        pt = Point(v['x'], v['y'])
+        pt_proj = ops.transform(wgs84_to_aeqd.transform, pt)
+        x, y = pt_proj.x, pt_proj.y
+        square_proj = box(x - buffer_m, y - buffer_m, x + buffer_m, y + buffer_m)
+        square_wsg84 = ops.transform(aeqd_to_wgs84.transform, square_proj)
+        squares[v["id"]] = {
+            "square_proj": square_proj,
+            "square_wgs84": square_wsg84,
+            "density": v["density"]
+            }
+    return squares
 
 print("Loaded functions.\n")

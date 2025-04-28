@@ -24,7 +24,7 @@ G_carall = csv_to_ig(network_data_pth, "Bucharest", "carall")
 with open(poi_data_pth/f'Bucharest_poi_nnidscarall.csv') as f:
     nnids = [int(line.rstrip()) for line in f]
 
-(GTs, GT_abstracts) = greedy_triangulation_routing(G_carall, nnids, prune_quantiles, prune_measures["betweenness"])
+(GTs, GT_abstracts) = greedy_triangulation_routing(G_carall, nnids, prune_quantiles, "betweenness")
 (MST, MST_abstract) = mst_routing(G_carall, nnids)
 
 results = {"placeid": "Bucharest", "prune_measure": prune_measures["betweenness"], "poi_source": "PlanBucuresti", "prune_quantiles": prune_quantiles, "GTs": GTs, "GT_abstracts": GT_abstracts, "MST": MST, "MST_abstract": MST_abstract}

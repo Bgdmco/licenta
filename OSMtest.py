@@ -159,4 +159,11 @@ G_combined = G.copy()
 #plt.title("Bike Lanes in Bucharest")
 #plt.show()
 
-#TODO-RUTE PE GRAPHUL FINAL DE LA MICHAEL
+#TODO
+
+##Population density pe cartiere ca metric pentru a vedea cati oameni au acces la pista de biciclete-worldpop.org - DONE-TREBUIE DOAR PLOTUIT PE GRAPH
+##Lungimea graphului cu pistele existente + rutele pe care le vor biciclestii-DONE
+##GT graph pana la lungimea graphului de mai sus-DONE
+##Metrics de la michael cu distanta parcursa cu masina din punctu A-B vs cu bicicleta-DONE
+##Acoperirea pistei de biciclete ca arie fata de oras-DONE
+##EDA pentru street network si pentru pista+dorinta biciclisti(nr noduri + edges, lungime, toate nodurile nu doar capetele edge-urilor)
