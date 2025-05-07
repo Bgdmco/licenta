@@ -1,5 +1,5 @@
-adauga graph-u cu pistele existente
-schimba unitatile de masura
-adauga punctul unde lungimea e egala
-overlap invers-ce am folosit din rutele care exista nu invers
-EDA-despre graph
+EDA-despre graph-uri
+
+TODO COD:
+Da iar run la tot scriptul
+Daca e timp-iplementeaza grid pois

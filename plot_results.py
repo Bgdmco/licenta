@@ -18,6 +18,7 @@ network_data_pth = data_pth/"network_data"
 poi_data_pth = data_pth/"poi_data"
 result_pth = data_pth/"results"
 plots_pth = data_pth/"plots"
+#plots_pth = plots_pth/"6quantiles"
 
 placeid = "Bucharest"
 poi_source = "PlanBucuresti"

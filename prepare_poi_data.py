@@ -24,7 +24,7 @@ G_carall_largest = G_carall.subgraph(largest_cc).copy()
 G_carall_largest.graph['crs'] = 'EPSG:4326'
 
 
-top_stations = ["Gara de Nord 1", "Basarab 1 - M1", "Obor", "Piața Sudului", "Titan", "Piața Unirii 1", "Dristor 1", "Eroilor", "Crângași", "Piața Victoriei 1", "Eroii Revoluției", "Politehnica", "Lujerului"]
+top_stations = ["Gara de Nord 1", "Basarab 1 - M1", "Obor", "Piața Sudului", "Titan", "Piața Unirii 1", "Dristor 1", "Eroilor", "Crângași", "Piața Victoriei 1", "Eroii Revoluției", "Politehnica", "Lujerului", "București Progresul"]
 
 metro_stations_gdf = ox.features_from_place(
     place_name, tags={"railway": "station", "subway": "yes"}
@@ -35,10 +35,11 @@ metro_stations_gdf = metro_stations_gdf[metro_stations_gdf["public_transport"] =
 metro_stations_gdf = metro_stations_gdf[metro_stations_gdf["name"].isin(top_stations)]
 
 points_of_interest = [
+    {"name": "Bucuresti Progresul", "lat": 44.365661, "lon": 26.091669},
     {"name": "Pipera", "lat": 44.50585, "lon": 26.13702},
     {"name": "Baneasa", "lat": 44.49456, "lon": 26.07914},
-    {"name": "Piata Victoriei", "lat": 44.45247, "lon": 26.08583},
-    {"name": "Politehnica", "lat": 44.44437, "lon": 26.05265},
+    #{"name": "Piata Victoriei", "lat": 44.45247, "lon": 26.08583},
+    #{"name": "Politehnica", "lat": 44.44437, "lon": 26.05265},
     {"name": "Jiului", "lat": 44.48249, "lon": 26.04104},
     {"name": "Palatul Parlamentului", "lat": 44.42754, "lon": 26.08785},
     {"name": "Chiajna", "lat": 44.45782, "lon": 25.97450},
@@ -47,9 +48,15 @@ points_of_interest = [
     {"name": "Pantelimon", "lat": 44.44811, "lon": 26.21096},
     {"name": "Icme Ecab", "lat": 44.42034, "lon": 26.21877},
     {"name": "Danubiana", "lat": 44.36317, "lon": 26.19406},
+    {"name": "Anticorosiv", "lat":44.406449, "lon":26.201620},
+    {"name": "Statie epurare", "lat": 44.394378, "lon":26232730},
+    {"name": "Vulcan SA", "lat": 44.358109, "lon":26.140956},
+    {"name": "Depozit Petrolier Petrom", "lat": 44.341158, "lon":26.091196},
     {"name": "Universitatea din Bucuresti", "lat": 44.43553, "lon": 26.10222},
     {"name": "Universitatea Politehnica", "lat": 44.43855, "lon": 26.04958},
     {"name": "ASE", "lat": 44.44475, "lon": 26.09778},
+    {"name": "Bucharest Mall", "lat":44.419860, "lon":26.126013},
+    #{"name": "Sun Plaza", "lat": 44.395257, "lon":26.121031},
     {"name": "AFI PALACE", "lat": 44.43099, "lon": 26.05433},
     {"name": "Baneasa Shopping City", "lat": 44.50794, "lon": 26.09133},
     {"name": "Plaza Romania", "lat": 44.42854, "lon": 26.03352},

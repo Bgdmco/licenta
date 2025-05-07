@@ -45,7 +45,12 @@ from pathlib import Path
 
 plotparam = {"bbox": (1280,1280),
 			"dpi": 96,
-            "toproutes": {"width": 0.5, "edge_color": 'Green'},
+            "toproutes_existing_routes": {"width": 0.5, "edge_color": 'Blue'},
+            "toproutes_riders_preferences_routes": {"width": 0.5, "edge_color": 'Green'},
+            "toproutes_transport_hubs_routes": {"width": 0.5, "edge_color": 'Red'},
+            "toproutes_employment_hubs_routes": {"width": 0.5, "edge_color": '#6d4d41'},
+            "toproutes_commercial_hubs_routes": {"width": 0.5, "edge_color": 'Purple'},
+            "toproutes_connectivity_routes": {"width": 0.5, "edge_color": 'Orange'},
 			"carall": {"width": 0.5, "edge_color": '#999999'},
 			# "biketrack": {"width": 1.25, "edge_color": '#2222ff'},
             "existing_biketrack": {"width": 0.5, "edge_color": 'Blue'},
@@ -59,7 +64,12 @@ plotparam = {"bbox": (1280,1280),
 			"highlight_bikeable": {"width": 3.75, "edge_color": '#222222', "node_color": '#222222'},
 			"poi_unreached": {"node_color": '#ff7338', "edgecolors": '#ffefe9'},
 			"poi_reached": {"node_color": '#0b8fa6', "edgecolors": '#f1fbff'},
-			"abstract": {"edge_color": '#000000', "alpha": 0.75}
+			"abstract": {"edge_color": '#000000', "alpha": 0.75},
+            "test1": {"width": 0.5, "edge_color": 'Green'},
+            "test2": {"width": 0.5, "edge_color": 'Red'},
+            "test3": {"width": 0.5, "edge_color": '#6d4d41'},
+            "test4": {"width": 0.5, "edge_color": 'Purple'},
+            "test5": {"width": 0.5, "edge_color": 'Orange'},
 			}
 
 
@@ -345,7 +355,7 @@ def ox_to_csv(G, p, placeid, parameterid, postfix = "", compress = True, verbose
         node, edge = ox.graph_to_gdfs(G)
     except ValueError:
         node, edge = gpd.GeoDataFrame(), gpd.GeoDataFrame()
-    prefix = placeid + '_' + parameterid + postfix
+    prefix = f"{placeid}_{parameterid}_{postfix}"
 
     node.to_csv(p/f"{prefix}_nodes.csv", index = True)
     if compress: compress_file(p, prefix + '_nodes')
@@ -353,7 +363,7 @@ def ox_to_csv(G, p, placeid, parameterid, postfix = "", compress = True, verbose
     edge.to_csv(p/f'{prefix}_edges.csv', index = True)
     if compress: compress_file(p, prefix + '_edges')
 
-    if verbose: print(placeid + ": Successfully wrote graph " + parameterid + postfix)
+    if verbose: print(f"{placeid}: Successfully wrote graph{parameterid}_{postfix}")
 
 def check_extract_zip(p, prefix):
     """ Check if a zip file prefix+'_nodes.zip' and + prefix+'_edges.zip'
@@ -960,6 +970,25 @@ def count_and_merge(n, bearings):
     return count[::2] + count[1::2]
 
 
+def calculate_bicycle_car_directness(G, G_carall, numnodepairs = 500):
+    indices = random.sample(list(G.vs), min(numnodepairs, len(G.vs)))
+    bicycle_poi_edges = []
+    car_poi_edges = []
+    for c, v in enumerate(indices):
+        bicycle_poi_edges.append(G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath"))
+        car_poi_edges.append(G_carall.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath"))
+    total_distance_bicycle_network = 0
+    total_distance_car = 0
+    for paths_e in bicycle_poi_edges:
+        if paths_e:
+            for path_e in paths_e:
+                # Sum up distances of path segments from first to last node
+                total_distance_bicycle_network += sum([G.es[e]['weight'] for e in path_e])
+    for paths_e in car_poi_edges:
+        for path_e in paths_e:
+            total_distance_car += sum([G_carall.es[e]['weight'] for e in path_e])
+    return total_distance_car / total_distance_bicycle_network
+
 def calculate_directness(G, numnodepairs = 500):
     """Calculate directness on G over all connected node pairs in indices. This calculation method divides the total sum of euclidian distances by total sum of network distances.
     """
@@ -1139,7 +1168,8 @@ def calculate_metrics(G, GT_abstract, G_big, population_squares ,nnids, calcmetr
           "efficiency_local": 0,
           "directness_lcc_linkwise": 0,
           "directness_all_linkwise": 0,
-          "population_coverage": 0
+          "population_coverage": 0,
+          "directness_bicycle_car": 0
          }, buffer_walk = 500, numnodepairs = 500, verbose = False, return_cov = True, G_prev = ig.Graph(), cov_prev = Polygon(), ignore_GT_abstract = False, Gexisting = {}):
     """Calculates all metrics (using the keys from calcmetrics).
     """
@@ -1222,6 +1252,8 @@ def calculate_metrics(G, GT_abstract, G_big, population_squares ,nnids, calcmetr
         if verbose and ("directness" in calcmetrics or "directness_lcc" in calcmetrics): print("Calculating directness...")
         if "directness" in calcmetrics:
             output["directness"] = calculate_directness(G, numnodepairs)
+        if "directness_bicycle_car" in calcmetrics:
+            output["directness_bicycle_car"] = calculate_bicycle_car_directness(G, G_big, numnodepairs)
         if "directness_lcc" in calcmetrics:
             if len(cl) > 1:
                 output["directness_lcc"] = calculate_directness(LCC, numnodepairs)
@@ -1332,7 +1364,8 @@ def calculate_metrics_additively(Gs, GT_abstracts,population_squares,prune_quant
             "efficiency_local_routed": [],
             "directness_lcc_linkwise": [],
             "directness_all_linkwise": [],
-            "population_coverage" : []      
+            "population_coverage" : [],
+            "directness_bicycle_car" : []   
             }):
     """Calculates all metrics, additively. 
     Coverage differences are calculated in every step instead of the whole coverage.
