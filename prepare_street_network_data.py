@@ -114,6 +114,11 @@ def construct_top_routes_network(Gs, network_data_pth, placeid, place_name):
             #Drumul taberei
             G_filtered.remove_nodes_from([287125492, 287125381, 287125491])
         if layer == "transport_hubs_routes":
+            #PROBLEM ON CALEA GRIVITEI WITH A ROAD UNDER CONSTRUCTION ON OSM DATABASE-NOT UPDATED
+            point1 = Point(26.049467, 44.471738)
+            point2 = Point(26.048556, 44.472870)
+            node1, node2  = [ox.distance.nearest_nodes(street_network, d.x, d.y) for d in [point1, point2]]
+            G_filtered.add_edge(node1, node2, name = "Calea Griviței", length = haversine_vector([point1.y, point1.x], [point2.y, point2.x], unit = "m")[0])
             #Bug on strada MATEI BASARAB on the two roundabouts
             point1 = Point(26.114530, 44.430491)
             point2 = Point(26.115180, 44.430494)
@@ -135,11 +140,6 @@ def construct_top_routes_network(Gs, network_data_pth, placeid, place_name):
             node1, node2  = [ox.distance.nearest_nodes(street_network, d.x, d.y) for d in [point1, point2]]
             G_filtered.add_edge(node1, node2, name = "Calea Călărașilor", length = haversine_vector([point1.y, point1.x], [point2.y, point2.x], unit = "m")[0])
         if layer == "employment_hubs_routes":
-            #PROBLEM ON CALEA GRIVITEI WITH A ROAD UNDER CONSTRUCTION ON OSM DATABASE-NOT UPDATED
-            point1 = Point(26.049467, 44.471738)
-            point2 = Point(26.048556, 44.472870)
-            node1, node2  = [ox.distance.nearest_nodes(street_network, d.x, d.y) for d in [point1, point2]]
-            G_filtered.add_edge(node1, node2, name = "Calea Griviței", length = haversine_vector([point1.y, point1.x], [point2.y, point2.x], unit = "m")[0])
             #PROBLEM ON CALEA 13 SEPTEMBRIE
             point1 = Point(26.076844, 44.424707)
             point2 = Point(26.078196, 44.425057)

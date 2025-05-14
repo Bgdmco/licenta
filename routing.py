@@ -27,5 +27,5 @@ with open(poi_data_pth/f'Bucharest_poi_nnidscarall.csv') as f:
 (GTs, GT_abstracts) = greedy_triangulation_routing(G_carall, nnids, prune_quantiles2, "betweenness")
 (MST, MST_abstract) = mst_routing(G_carall, nnids)
 
-results = {"placeid": "Bucharest", "prune_measure": prune_measures["betweenness"], "poi_source": "PlanBucuresti", "prune_quantiles": prune_quantiles, "GTs": GTs, "GT_abstracts": GT_abstracts, "MST": MST, "MST_abstract": MST_abstract}
+results = {"placeid": "Bucharest", "prune_measure": prune_measures["betweenness"], "poi_source": "PlanBucuresti", "prune_quantiles": prune_quantiles2, "GTs": GTs, "GT_abstracts": GT_abstracts, "MST": MST, "MST_abstract": MST_abstract}
 write_result(result_pth,results, "pickle", "Bucharest", "PlanBucuresti_6prune_quantiles", prune_measures["betweenness"], ".pickle")

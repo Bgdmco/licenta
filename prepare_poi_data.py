@@ -45,7 +45,7 @@ points_of_interest = [
     {"name": "Chiajna", "lat": 44.45782, "lon": 25.97450},
     {"name": "Institutul de fizica", "lat": 44.348957, "lon": 26.03074},
     {"name": "NordEst Logistic Park", "lat": 44.48592, "lon": 26.21884},
-    {"name": "Pantelimon", "lat": 44.44811, "lon": 26.21096},
+    {"name": "Pantelimon", "lat": 44.464273, "lon": 26.208355},
     {"name": "Icme Ecab", "lat": 44.42034, "lon": 26.21877},
     {"name": "Danubiana", "lat": 44.36317, "lon": 26.19406},
     {"name": "Anticorosiv", "lat":44.406449, "lon":26.201620},

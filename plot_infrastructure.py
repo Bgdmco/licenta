@@ -19,23 +19,21 @@ import pickle
 def plot_street_network(network_data_pth, plots_pth, placeid, map_center, plotparam):
     G_carall = csv_to_ig(network_data_pth, placeid, "carall")
     fig = initplot()
-    ax = fig.gca()
-    nxdraw(G_carall, "carall", map_center, ax=ax)
+    nxdraw(G_carall, "carall", map_center)
     plt.savefig(plots_pth/f'{placeid}_carall.pdf', bbox_inches="tight")
     plt.savefig(plots_pth/f'{placeid}_carall.png', bbox_inches="tight", dpi=plotparam["dpi"])
     plt.close()
 
-def plot_bicycle_network_plan(network_data_pth, plots_pth, placeid, map_center, plotparam, routes_layers, plot_all = True):
+def plot_bicycle_network_plan(network_data_pth, plots_pth, placeid, map_center, plotparam, routes_layers,nnids, nodesize_poi ,plot_all = True):
     G_carall = csv_to_ig(network_data_pth, placeid, "carall")
     G_layers = {}
     for layer in routes_layers:
         G_layers[layer] = csv_to_ig(network_data_pth, placeid, f"toproutes_{layer}")
     fig = initplot()
-    ax = fig.gca()
-    nxdraw(G_carall, "carall", map_center, ax = ax)
+    nxdraw(G_carall, "carall", map_center)
     i = 1
     for layer in routes_layers:
-        nxdraw(G_layers[layer], f"toproutes_{layer}", map_center, ax = ax)
+        nxdraw(G_layers[layer], f"toproutes_{layer}", map_center)
         if plot_all:
             plt.savefig(plots_pth/f'{placeid}_toproutes_{i}.pdf', bbox_inches="tight")
             plt.savefig(plots_pth/f'{placeid}_toproutes_{i}.png', bbox_inches="tight", dpi=plotparam["dpi"])
@@ -45,17 +43,15 @@ def plot_bicycle_network_plan(network_data_pth, plots_pth, placeid, map_center, 
             plt.savefig(plots_pth/f'{placeid}_toproutes_{layer}.png', bbox_inches="tight", dpi=plotparam["dpi"])
             plt.close()
             fig = initplot()
-            ax = fig.gca()
-            nxdraw(G_carall, "carall", map_center, ax = ax)
+            nxdraw(G_carall, "carall", map_center)
     plt.close()
 
 
 def plot_pois_on_G_carall(network_data_pth, plots_pth, placeid, poi_source, nodesize_poi, map_center, nnids, plotparam):
     G_carall = csv_to_ig(network_data_pth, placeid, "carall")
     fig = initplot()
-    ax = fig.gca()
-    nxdraw(G_carall, "carall", map_center, ax = ax)
-    nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi, ax = ax)
+    nxdraw(G_carall, "carall", map_center)
+    nxdraw(G_carall, "poi_unreached", map_center, nnids, "nx.draw_networkx_nodes", nodesize_poi)
     plt.savefig(plots_pth/f'{placeid}_carall_poi_{poi_source}.pdf', bbox_inches="tight")
     plt.savefig(plots_pth/f'{placeid}_carall_poi_{poi_source}.png', bbox_inches="tight", dpi=plotparam["dpi"])
     plt.close()
@@ -93,5 +89,6 @@ if __name__ == "__main__":
     routes_layers = ["existing_routes","riders_preferences_routes", "transport_hubs_routes", "employment_hubs_routes", "commercial_hubs_routes", "connectivity_routes"]
     G_carall = csv_to_ig(network_data_pth, placeid, "carall")
     map_center = nxdraw(G_carall, "carall")
-    plot_bicycle_network_plan(network_data_pth, plots_pth, placeid, map_center, plotparam, routes_layers, True)
+    #plot_bicycle_network_plan(network_data_pth, plots_pth, placeid, map_center, plotparam, routes_layers,nnids, nodesize_poi,True)
     #plot_pois_on_G_carall(network_data_pth, plots_pth, placeid, poi_source, nodesize_poi, map_center, nnids, plotparam)
+    plot_street_network(network_data_pth, plots_pth, placeid, map_center, plotparam)

@@ -45,12 +45,12 @@ from pathlib import Path
 
 plotparam = {"bbox": (1280,1280),
 			"dpi": 96,
-            "toproutes_existing_routes": {"width": 0.5, "edge_color": 'Blue'},
-            "toproutes_riders_preferences_routes": {"width": 0.5, "edge_color": 'Green'},
-            "toproutes_transport_hubs_routes": {"width": 0.5, "edge_color": 'Red'},
-            "toproutes_employment_hubs_routes": {"width": 0.5, "edge_color": '#6d4d41'},
-            "toproutes_commercial_hubs_routes": {"width": 0.5, "edge_color": 'Purple'},
-            "toproutes_connectivity_routes": {"width": 0.5, "edge_color": 'Orange'},
+            "toproutes_existing_routes": {"width": 1, "edge_color": 'Blue'},
+            "toproutes_riders_preferences_routes": {"width": 1, "edge_color": 'Green'},
+            "toproutes_transport_hubs_routes": {"width": 1, "edge_color": 'Red'},
+            "toproutes_employment_hubs_routes": {"width": 1, "edge_color": '#6d4d41'},
+            "toproutes_commercial_hubs_routes": {"width": 1, "edge_color": 'Purple'},
+            "toproutes_connectivity_routes": {"width": 1, "edge_color": 'Orange'},
 			"carall": {"width": 0.5, "edge_color": '#999999'},
 			# "biketrack": {"width": 1.25, "edge_color": '#2222ff'},
             "existing_biketrack": {"width": 0.5, "edge_color": 'Blue'},
@@ -197,7 +197,7 @@ def simplify_ig(G):
     return output
 
 
-def nxdraw(G, networktype, map_center = False, nnids = False, drawfunc = "nx.draw", nodesize = 0, weighted = False, maxwidthsquared = 0, simplified = False, ax = None):
+def nxdraw(G, networktype, map_center = False, nnids = False, drawfunc = "nx.draw", nodesize = 0, weighted = False, maxwidthsquared = 0, simplified = False):
     """Take an igraph graph G and draw it with a networkx drawfunc.
     """
     if simplified:
@@ -215,11 +215,11 @@ def nxdraw(G, networktype, map_center = False, nnids = False, drawfunc = "nx.dra
         widths = list(nx.get_edge_attributes(G_nx, "weight").values())
         widthfactor = 1.1 * math.sqrt(maxwidthsquared) / max(widths)
         widths = [max(0.33, w * widthfactor) for w in widths]
-        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = widths, ax = ax)
+        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = widths)
     elif type(weighted) is float or type(weighted) is int and weighted > 0:
-        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = weighted, ax = ax)
+        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, width = weighted)
     else:
-        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize, ax = ax)
+        eval(drawfunc)(G_nx, pos_transformed, **plotparam[networktype], node_size = nodesize)
     return map_center
 
 
@@ -290,8 +290,8 @@ def dist(v1, v2):
     dist = haversine((v1['y'],v1['x']),(v2['y'],v2['x']), unit="m") # x is lon, y is lat
     return dist
 
-def dist_vector(v1_list, v2_list):
-    dist_list = haversine_vector(v1_list, v2_list, unit="m") # [(lat,lon)], [(lat,lon)]
+def dist_vector(v1_list, v2_list, comb = False):
+    dist_list = haversine_vector(v1_list, v2_list, unit="m", comb = comb) # [(lat,lon)], [(lat,lon)]
     return dist_list
 
 def osm_to_ig(node, edge):
@@ -325,17 +325,20 @@ def osm_to_ig(node, edge):
         edge_info["weight"] = []
         edge_info["osmid"] = []
         edge_info['name'] = []
+        edge_info['oneway'] = []
         for i in range(len(edge)):
             edge_list.append([id_dict.get(edge['u'][i]), id_dict.get(edge['v'][i])])
             edge_info["weight"].append(round(edge['length'][i], 10))
             edge_info["osmid"].append(edge['osmid'][i])
             edge_info['name'].append(edge['name'][i])
+            edge_info['oneway'].append(edge['oneway'][i])
 
         G.add_edges(edge_list) # attributes = edge_info doesn't work although it should: https://igraph.org/python/doc/igraph.Graph-class.html#add_edges
         for i in range(len(edge)):
             G.es[i]["weight"] = edge_info["weight"][i]
             G.es[i]["osmid"] = edge_info["osmid"][i]
             G.es[i]['name'] = edge_info['name'][i]
+            G.es[i]['oneway'] = edge_info['oneway'][i]
         try:
             G.simplify(combine_edges=max)
         except TypeError:
@@ -972,22 +975,37 @@ def count_and_merge(n, bearings):
 
 def calculate_bicycle_car_directness(G, G_carall, numnodepairs = 500):
     indices = random.sample(list(G.vs), min(numnodepairs, len(G.vs)))
+    car_indices = []
+    for i in indices:
+        car_indices.append(G_carall.vs.find(id = i['id']).index)
     bicycle_poi_edges = []
     car_poi_edges = []
+    directness = []
+    bike_disconnected = 0
     for c, v in enumerate(indices):
-        bicycle_poi_edges.append(G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath"))
-        car_poi_edges.append(G_carall.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath"))
-    total_distance_bicycle_network = 0
-    total_distance_car = 0
-    for paths_e in bicycle_poi_edges:
-        if paths_e:
-            for path_e in paths_e:
-                # Sum up distances of path segments from first to last node
-                total_distance_bicycle_network += sum([G.es[e]['weight'] for e in path_e])
-    for paths_e in car_poi_edges:
-        for path_e in paths_e:
-            total_distance_car += sum([G_carall.es[e]['weight'] for e in path_e])
-    return total_distance_car / total_distance_bicycle_network
+        bike_paths = G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath")
+        car_paths = G_carall.get_shortest_paths(car_indices[c], car_indices[c:], weights = "weight", output = "epath")
+        bike_paths.pop(0)
+        car_paths.pop(0)
+        for car_path, bike_path in zip(car_paths, bike_paths):
+            if bike_path:
+                bicycle_distance = sum([G.es[e]['weight'] for e in bike_path])
+                car_distance = sum([G_carall.es[e]['weight'] for e in car_path])
+                directness.append(car_distance/bicycle_distance)
+            else:
+                bike_disconnected += 1
+    #for i, paths_e in enumerate(bicycle_poi_edges):
+    #    if paths_e:
+    #        for path_e in paths_e:
+    #            # Sum up distances of path segments from first to last node
+    #            bicycle_distance = sum([G.es[e]['weight'] for e in path_e])
+    #        for path_e in car_poi_edges[i]:
+    #            car_distance = sum([G_carall.es[e]['weight'] for e in path_e])
+    #        if bicycle_distance != 0:
+    #            directness.append(car_distance/bicycle_distance)
+    total_pairs = int((len(indices)*(len(indices)-1))/2)
+    reachability = (total_pairs-bike_disconnected) * 100/total_pairs   
+    return (listmean(directness), reachability)
 
 def calculate_directness(G, numnodepairs = 500):
     """Calculate directness on G over all connected node pairs in indices. This calculation method divides the total sum of euclidian distances by total sum of network distances.
@@ -1022,6 +1040,7 @@ def calculate_directness_linkwise(G, numnodepairs = 500):
 
     directness_links = np.zeros(int((len(indices)*(len(indices)-1))/2))
     ind = 0
+    disconnected = 0
     for c, v in enumerate(indices):
         poi_edges = G.get_shortest_paths(v, indices[c:], weights = "weight", output = "epath")
         for c_delta, path_e in enumerate(poi_edges[1:]): # Discard first empty list because it is the node to itself
@@ -1031,9 +1050,13 @@ def calculate_directness_linkwise(G, numnodepairs = 500):
 
                 directness_links[ind] = distance_direct / distance_network
                 ind += 1
+            else:
+                disconnected += 1
+    total_pairs = int((len(indices)*(len(indices)-1))/2)
+    reachability = (total_pairs-disconnected) * 100/total_pairs
     directness_links = directness_links[:ind] # discard disconnected node pairs
 
-    return np.mean(directness_links)
+    return (np.mean(directness_links), reachability)
 
 
 def listmean(lst): 
@@ -1473,10 +1496,10 @@ def ig_to_shapely(G):
 
 def initplot():
     fig = plt.figure(figsize=(plotparam["bbox"][0]/plotparam["dpi"], plotparam["bbox"][1]/plotparam["dpi"]), dpi=plotparam["dpi"])
-    plt.axes().set_aspect('equal')
-    plt.axes().set_xmargin(0.01)
-    plt.axes().set_ymargin(0.01)
-    plt.axes().set_axis_off() # Does not work anymore - unnown why not.
+    ax = plt.axes()
+    ax.set_xmargin(0.01)
+    ax.set_ymargin(0.01)
+    ax.set_axis_off() # Does not work anymore - unnown why not.
     return fig
 
 def calculate_population_coverage(G, G_carall, population_squares, buffer_m):
